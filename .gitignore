@@ -1,0 +1,7 @@
+node_modules/
+dist
+**/.idea
+**/target
+*.orig
+*.log
+*.iml
