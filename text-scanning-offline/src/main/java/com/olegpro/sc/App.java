@@ -2,8 +2,11 @@ package com.olegpro.sc;
 
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Scanner;
 import java.util.regex.Pattern;
 
@@ -19,36 +22,67 @@ import java.util.regex.Pattern;
  * * Do we have to statically define the amount of digits in the number? Definitey not... this can be inferred by dividing the line length by the digit width.
  */
 public class App {
-    static int digitWidth = 3;
-    static int digitHeight = 3;
-    static int numberOfDigits = 9;
-    static int lineLength = numberOfDigits * digitWidth;
-    static String multipleChunksFilePath = "/Users/oleg/IdeaProjects/java-interviews/text-scanning-offline/input/multipleChunks";
-    static String multipleChunksWithIllegalRowFilePath = "/Users/oleg/IdeaProjects/java-interviews/text-scanning-offline/input/multipleChunksWithIllegalRow";
+    int digitWidth;
+    int digitHeight;
+    int numberOfDigits;
+    int lineLength = numberOfDigits * digitWidth;
+    String multipleChunksFilePath;
+    String multipleChunksWithIllegalRowFilePath;
+    String digitsFilePath;
 
     public static void main(String[] args) {
+        try {
+            (new App()).run();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
 
+    private void run() throws Exception {
+        init();
+        process();
+    }
+
+    private void process() throws Exception {
         try {
             Map<String, Integer> digitsMap = readDigitsMap();
             readInputFile(digitsMap, multipleChunksFilePath);
             readInputFile(digitsMap, multipleChunksWithIllegalRowFilePath);
         } catch (FileNotFoundException e) {
-            e.printStackTrace();
+            throw new Exception("Processing failed", e);
         }
-
     }
 
-    private static void readInputFile(Map<String, Integer> digitsMap, String path) throws FileNotFoundException {
+    private void init() throws Exception {
+        final Properties properties = new Properties();
+        try (
+                final InputStream stream =
+                        this.getClass().getResourceAsStream("/App.properties")) {
+            properties.load(stream);
+
+            digitWidth = Integer.valueOf(properties.getProperty("digitWidth"));
+            digitHeight = Integer.valueOf(properties.getProperty("digitHeight"));
+            numberOfDigits = Integer.valueOf(properties.getProperty("numberOfDigits"));
+            lineLength = numberOfDigits * digitWidth;
+            multipleChunksFilePath = properties.getProperty("multipleChunksFilePath");
+            multipleChunksWithIllegalRowFilePath = properties.getProperty("multipleChunksWithIllegalRowFilePath");
+            digitsFilePath = properties.getProperty("digitsFilePath");
+        } catch (IOException e) {
+            throw new Exception("Initialisation failed", e);
+        }
+    }
+
+    private void readInputFile(Map<String, Integer> digitsMap, String path) throws FileNotFoundException {
         System.out.printf("Reading %s %n", path);
         File inputFile = new File(path);
         Scanner inputFileScanner = new Scanner(inputFile);
         inputFileScanner.useDelimiter(Pattern.compile("\\n\\s*\\n"));
-        while(inputFileScanner.hasNext()) {
+        while (inputFileScanner.hasNext()) {
 
             String[] lines = readAndValidateNextChunk(inputFileScanner);
             Boolean hadIllegalSymbols = Boolean.FALSE;
             for (int digitNumber = 0; digitNumber < numberOfDigits; digitNumber++) {
-                int offset = digitNumber*digitWidth;
+                int offset = digitNumber * digitWidth;
                 String digit = readDigit(lines, offset, digitWidth, digitHeight);
                 String output;
 
@@ -67,17 +101,17 @@ public class App {
         }
     }
 
-    private static Map<String, Integer> readDigitsMap() throws FileNotFoundException {
+    private Map<String, Integer> readDigitsMap() throws FileNotFoundException {
         Map<String, Integer> digitsMap = new HashMap<String, Integer>();
-        File inputFile = new File("/Users/oleg/IdeaProjects/java-interviews/text-scanning-offline/input/digits");
+        File inputFile = new File(digitsFilePath);
         Scanner inputFileScanner = new Scanner(inputFile);
         inputFileScanner.useDelimiter(Pattern.compile("\\n\\s*\\n"));
-        if(inputFileScanner.hasNext()) {
+        if (inputFileScanner.hasNext()) {
 
             String[] lines = readAndValidateNextChunk(inputFileScanner);
 
             for (int digitNumber = 0; digitNumber < numberOfDigits; digitNumber++) {
-                int offset = digitNumber*digitWidth;
+                int offset = digitNumber * digitWidth;
                 String digit = readDigit(lines, offset, digitWidth, digitHeight);
                 digitsMap.put(digit, Integer.valueOf(digitNumber));
             }
@@ -87,29 +121,29 @@ public class App {
         return digitsMap;
     }
 
-    private static String[] readAndValidateNextChunk(Scanner inputFileScanner) {
+    private String[] readAndValidateNextChunk(Scanner inputFileScanner) {
         String chunk = inputFileScanner.next();
         String[] lines = chunk.split("\\n");
         validateLines(lines, digitHeight, lineLength);
         return lines;
     }
 
-    private static void validateLines(String[] lines, int numLinesInChunk, int lineLength) {
+    private void validateLines(String[] lines, int numLinesInChunk, int lineLength) {
         if (lines == null) throw new IllegalArgumentException("Lines argument is null");
         if (numLinesInChunk != lines.length) {
-            System.out.printf("Incorrect number of lines in chunk. Expected %d, found %d",numLinesInChunk, lines.length);
+            System.out.printf("Incorrect number of lines in chunk. Expected %d, found %d", numLinesInChunk, lines.length);
         }
-        for(String line : lines) {
+        for (String line : lines) {
             if (lineLength != line.length()) {
                 System.out.printf("Line %s has incorrect length. Expected %d, found %d", line, lineLength, line.length());
             }
         }
     }
 
-    private static String readDigit(String[] lines, int offset, int digitWidth, int digitHeight) {
+    private String readDigit(String[] lines, int offset, int digitWidth, int digitHeight) {
         StringBuffer digit = new StringBuffer();
         for (int row = 0; row < digitHeight; row++) {
-            digit.append(lines[row].substring(offset, offset+digitWidth));
+            digit.append(lines[row].substring(offset, offset + digitWidth));
         }
         return digit.toString();
     }
