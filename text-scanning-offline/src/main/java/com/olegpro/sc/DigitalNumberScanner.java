@@ -17,15 +17,18 @@ import java.util.regex.Pattern;
  * * Refactor to the proper classes and methods
  * * Clean up the variables naming
  * * Testing
- * * Much more input validation
- * * Infer the sizing from the digit map file... maybe?
- * * Do we have to statically define the amount of digits in the number? Definitely not... this can be inferred by dividing the line length by the digit width.
  */
-public class App {
+public class DigitalNumberScanner {
+    static final Pattern CHUNK_DELIMITER_REGEXP_PATTERN = Pattern.compile("\\n\\s*\\n");
+    static final String DIGITS_MAP_FILE_CLASSPATH_RESOURCE_PATH = "/digits";
+    static final String APP_PROPERTIES_CLASSPATH_RESOURCE_PATH = "/DigitalNumberScanner.properties";
+    static final String LINE_DELIMITER_REGEXP = "\\n";
+    static final String UNRECOGNIZED_SYMBOL_SIGN = "?";
     int digitWidth;
     int digitHeight;
     int numberOfDigits;
-    int lineLength = numberOfDigits * digitWidth;
+    int lineLength;
+    DigitReader digitReader = new DigitReader();
     Map<String, Integer> digitsMap;
 
     /**
@@ -36,7 +39,7 @@ public class App {
     public static void main(String[] args) {
         try {
             String inputFilePath = args[0];
-            App digitalNumberScanner = new App();
+            DigitalNumberScanner digitalNumberScanner = new DigitalNumberScanner();
             digitalNumberScanner.init();
             digitalNumberScanner.scanInputFile(inputFilePath);
         } catch (Exception e) {
@@ -48,17 +51,17 @@ public class App {
      * Reads in the application properties as well as the digit symbol definitions.
      * @throws Exception and wraps any specific exception occurring during the initialization into it.
      */
-    private void init() throws Exception {
+    void init() throws Exception {
         final Properties properties = new Properties();
         try (
-                final InputStream stream =
-                        this.getClass().getResourceAsStream("/App.properties")) {
-            properties.load(stream);
+                final InputStream propertiesFileInputStream =
+                        this.getClass().getResourceAsStream(APP_PROPERTIES_CLASSPATH_RESOURCE_PATH)) {
+            properties.load(propertiesFileInputStream);
             digitWidth = Integer.valueOf(properties.getProperty("digitWidth"));
             digitHeight = Integer.valueOf(properties.getProperty("digitHeight"));
             numberOfDigits = Integer.valueOf(properties.getProperty("numberOfDigits"));
             lineLength = numberOfDigits * digitWidth;
-            digitsMap = readDigitsMap();
+            initDigitsMap();
         } catch (IOException e) {
             throw new Exception("Initialisation failed", e);
         }
@@ -69,7 +72,7 @@ public class App {
             System.out.printf("Reading %s %n", inputFilePath);
             File inputFile = new File(inputFilePath);
             Scanner inputFileScanner = new Scanner(inputFile);
-            inputFileScanner.useDelimiter(Pattern.compile("\\n\\s*\\n"));
+            inputFileScanner.useDelimiter(CHUNK_DELIMITER_REGEXP_PATTERN);
             while (inputFileScanner.hasNext()) {
                 // Read and validate that the lines conform to expectations. If not, the null is returned and the chunk is skipped.
                 String[] lines = readAndValidateNextChunk(inputFileScanner);
@@ -77,14 +80,9 @@ public class App {
                 Boolean hadIllegalSymbols = Boolean.FALSE;
                 for (int digitNumber = 0; digitNumber < numberOfDigits; digitNumber++) {
                     int offset = digitNumber * digitWidth;
-                    String digit = readDigit(lines, offset, digitWidth, digitHeight);
-                    String output;
-                    if (digitsMap.containsKey(digit)) {
-                        output = digitsMap.get(digit).toString();
-                    } else {
-                        output = "?";
-                        hadIllegalSymbols = Boolean.TRUE;
-                    }
+                    String digit = digitReader.read(lines, offset, digitWidth, digitHeight);
+                    String output = recognizeDigit(digit);
+                    hadIllegalSymbols |= (UNRECOGNIZED_SYMBOL_SIGN.equals(output));
                     System.out.print(output);
                 }
                 if (hadIllegalSymbols) {
@@ -97,39 +95,53 @@ public class App {
         }
     }
 
-    private Map<String, Integer> readDigitsMap() throws Exception {
-        Map<String, Integer> digitsMap = new HashMap<String, Integer>();
-        final InputStream stream =
-                this.getClass().getResourceAsStream("/digits");
-        Scanner inputFileScanner = new Scanner(stream);
-        inputFileScanner.useDelimiter(Pattern.compile("\\n\\s*\\n"));
-        if (inputFileScanner.hasNext()) {
-            String[] lines = readAndValidateNextChunk(inputFileScanner);
-            for (int digitNumber = 0; digitNumber < numberOfDigits; digitNumber++) {
-                int offset = digitNumber * digitWidth;
-                String digit = readDigit(lines, offset, digitWidth, digitHeight);
-                digitsMap.put(digit, Integer.valueOf(digitNumber));
+    String recognizeDigit(String digit) {
+        return (digitsMap.containsKey(digit)) ? digitsMap.get(digit).toString() : UNRECOGNIZED_SYMBOL_SIGN;
+    }
+
+    /** Creates a new map and fills it from the statically defined file in resources.
+     * @throws Exception
+     */
+    private void initDigitsMap() throws Exception {
+        digitsMap = new HashMap<String, Integer>();
+        Scanner inputFileScanner;
+        try (InputStream stream = this.getClass().getResourceAsStream(DIGITS_MAP_FILE_CLASSPATH_RESOURCE_PATH)) {
+            inputFileScanner = new Scanner(stream);
+            inputFileScanner.useDelimiter(CHUNK_DELIMITER_REGEXP_PATTERN);
+            if (inputFileScanner.hasNext()) {
+                String[] lines = readAndValidateNextChunk(inputFileScanner);
+                for (int digitNumber = 0; digitNumber < numberOfDigits; digitNumber++) {
+                    int offset = digitNumber * digitWidth;
+                    String digit = digitReader.read(lines, offset, digitWidth, digitHeight);
+                    digitsMap.put(digit, Integer.valueOf(digitNumber+1));
+                }
+            }
+            else {
+                throw new Exception("Failed reading digits map");
             }
         }
-        else {
-            throw new Exception("Failed reading digits map");
+        catch (RuntimeException e) {
+            throw new Exception("Failed reading digits map", e);
         }
-        return digitsMap;
+
     }
 
     /**
      * @param inputFileScanner
      * @return array of strings of expected size, or null in case the chunk doesn't conform to expectations.
      */
-    private String[] readAndValidateNextChunk(Scanner inputFileScanner) {
+    String[] readAndValidateNextChunk(Scanner inputFileScanner) {
         if (inputFileScanner == null) throw new IllegalArgumentException("Scanner argument is null.");
         String chunk = inputFileScanner.next();
-        String[] lines = chunk.split("\\n");
+        String[] lines = chunk.split(LINE_DELIMITER_REGEXP);
         if (validateChunkLines(lines, digitHeight, lineLength)) return lines;
-        else return null;
+        else {
+            System.out.printf("Cannot read the chunk %n%s%n", chunk);
+            return null;
+        }
     }
 
-    private boolean validateChunkLines(String[] lines, int numLinesInChunk, int lineLength) {
+    boolean validateChunkLines(String[] lines, int numLinesInChunk, int lineLength) {
         if (lines == null) throw new IllegalArgumentException("Lines argument is null");
         if (numLinesInChunk != lines.length) {
             System.out.printf("Incorrect number of lines in chunk. Expected %d, found %d.%n", numLinesInChunk, lines.length);
@@ -144,11 +156,4 @@ public class App {
         return true;
     }
 
-    private String readDigit(String[] lines, int offset, int digitWidth, int digitHeight) {
-        StringBuffer digit = new StringBuffer();
-        for (int row = 0; row < digitHeight; row++) {
-            digit.append(lines[row].substring(offset, offset + digitWidth));
-        }
-        return digit.toString();
-    }
 }
