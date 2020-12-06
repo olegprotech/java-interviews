@@ -29,8 +29,7 @@ public class DigitalNumberScannerTest
     public void shouldScanSingleChunk() throws Exception {
         StringBuffer consoleOutput = new StringBuffer();
         digitalNumberScanner.outputStreamProvider = (output) -> {consoleOutput.append(output);};
-        URL resource = this.getClass().getResource("/singleChunk");
-        digitalNumberScanner.scan(Paths.get(resource.toURI()).toFile().getAbsolutePath());
+        digitalNumberScanner.scan(this.getClass().getResource("/singleChunk").getPath());
         assertEquals(String.format("000000000%n"), consoleOutput.toString());
     }
 
