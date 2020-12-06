@@ -1,13 +1,11 @@
 package com.olegpro.sc;
 
-import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
-import java.util.Scanner;
 import java.util.function.Consumer;
 import java.util.regex.Pattern;
 
@@ -19,7 +17,6 @@ import java.util.regex.Pattern;
  * * Testing
  */
 public class DigitalNumberScanner {
-    static final Pattern CHUNK_DELIMITER_REGEXP_PATTERN = Pattern.compile("\\n\\s*\\n");
     static final String DIGITS_MAP_FILE_CLASSPATH_RESOURCE_PATH = "/digits";
     static final String APP_PROPERTIES_CLASSPATH_RESOURCE_PATH = "/DigitalNumberScanner.properties";
     static final String LINE_DELIMITER_REGEXP = "\\n";
@@ -28,8 +25,8 @@ public class DigitalNumberScanner {
     private int digitWidth;
     private int digitHeight;
     private int numberOfDigitsInAChunk;
-    private int numberOfDigits;
-    private int lineLength;
+    private int numberOfDigitsInDigitsMap;
+    private int chunkLineLength;
     private DigitReader digitReader;
     private Map<String, Integer> digitsMap;
     Consumer<String> dataOutputProvider = System.out::print;
@@ -61,11 +58,11 @@ public class DigitalNumberScanner {
                 final InputStream propertiesFileInputStream =
                         this.getClass().getResourceAsStream(APP_PROPERTIES_CLASSPATH_RESOURCE_PATH)) {
             properties.load(propertiesFileInputStream);
-            digitWidth = Integer.valueOf(properties.getProperty("digitWidth"));
-            digitHeight = Integer.valueOf(properties.getProperty("digitHeight"));
-            numberOfDigits = Integer.valueOf(properties.getProperty("numberOfDigits"));
-            numberOfDigitsInAChunk = Integer.valueOf(properties.getProperty("numberOfDigitsInAChunk"));
-            lineLength = numberOfDigitsInAChunk * digitWidth;
+            digitWidth = Integer.valueOf(properties.getProperty("digital.number.scanner.digit.width"));
+            digitHeight = Integer.valueOf(properties.getProperty("digital.number.scanner.digit.height"));
+            numberOfDigitsInDigitsMap = Integer.valueOf(properties.getProperty("digital.number.scanner.map.numberOfDigits"));
+            numberOfDigitsInAChunk = Integer.valueOf(properties.getProperty("digital.number.scanner.chunk.numberOfDigits"));
+            chunkLineLength = numberOfDigitsInAChunk * digitWidth;
             digitReader = new DigitReader(digitWidth, digitHeight);
             initDigitsMap();
         } catch (IOException e) {
@@ -76,11 +73,9 @@ public class DigitalNumberScanner {
     public void scan(String inputFilePath) throws Exception {
         try {
             logOutputProvider.accept(String.format("Reading %s %n", inputFilePath));
-            File inputFile = new File(inputFilePath);
-            Scanner inputFileScanner = new Scanner(inputFile);
-            inputFileScanner.useDelimiter(CHUNK_DELIMITER_REGEXP_PATTERN);
-            while (inputFileScanner.hasNext()) {
-                String chunk = inputFileScanner.next();
+            TextFileChunker inputFileChunker = new TextFileChunker(inputFilePath);
+            while (inputFileChunker.hasNext()) {
+                String chunk = inputFileChunker.next();
                 String[] lines = chunk.split(LINE_DELIMITER_REGEXP);
                 if (!validateChunkLines(lines)) {
                     logOutputProvider.accept(String.format("Cannot read the chunk %n%s%n", chunk));
@@ -114,13 +109,13 @@ public class DigitalNumberScanner {
      */
     private void initDigitsMap() throws Exception {
         digitsMap = new HashMap<String, Integer>();
-        Scanner inputFileScanner;
-        try (InputStream stream = this.getClass().getResourceAsStream(DIGITS_MAP_FILE_CLASSPATH_RESOURCE_PATH)) {
-            inputFileScanner = new Scanner(stream);
-            inputFileScanner.useDelimiter(CHUNK_DELIMITER_REGEXP_PATTERN);
-            if (inputFileScanner.hasNext()) {
-                String[] lines = inputFileScanner.next().split(LINE_DELIMITER_REGEXP);
-                for (int digitNumber = 0; digitNumber < numberOfDigits; digitNumber++) {
+        try {
+            final InputStream digitsMapFileInputStream =
+                    this.getClass().getResourceAsStream(DIGITS_MAP_FILE_CLASSPATH_RESOURCE_PATH);
+            TextFileChunker inputFileChunker = new TextFileChunker(digitsMapFileInputStream);
+            if (inputFileChunker.hasNext()) {
+                String[] lines = inputFileChunker.next().split(LINE_DELIMITER_REGEXP);
+                for (int digitNumber = 0; digitNumber < numberOfDigitsInDigitsMap; digitNumber++) {
                     String digit = digitReader.read(lines, digitNumber);
                     digitsMap.put(digit, Integer.valueOf(digitNumber));
                 }
@@ -142,8 +137,8 @@ public class DigitalNumberScanner {
             return false;
         }
         for (String line : lines) {
-            if (lineLength != line.length()) {
-                logOutputProvider.accept(String.format("Line %s has incorrect length. Expected %d, found %d.%n", line, lineLength, line.length()));
+            if (chunkLineLength != line.length()) {
+                logOutputProvider.accept(String.format("Line %s has incorrect length. Expected %d, found %d.%n", line, chunkLineLength, line.length()));
                 return false;
             }
         }
