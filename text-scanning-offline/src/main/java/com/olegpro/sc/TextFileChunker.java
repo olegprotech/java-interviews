@@ -34,4 +34,8 @@ public class TextFileChunker {
         return inputFileScanner.next();
     }
 
+    public void close() {
+        inputFileScanner.close();
+    }
+
 }

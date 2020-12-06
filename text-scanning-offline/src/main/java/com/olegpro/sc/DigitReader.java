@@ -21,7 +21,7 @@ public class DigitReader {
      */
     public String read(String[] lines, int digitNumber) {
         final int offset = digitNumber * digitWidth;
-        StringBuffer digit = new StringBuffer();
+        StringBuilder digit = new StringBuilder();
         for (int row = 0; row < digitHeight; row++) {
             digit.append(lines[row].substring(offset, offset + digitWidth));
         }

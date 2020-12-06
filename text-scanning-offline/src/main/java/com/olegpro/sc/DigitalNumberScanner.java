@@ -50,11 +50,16 @@ public class DigitalNumberScanner {
      * Reads in the application properties as well as the digit symbol definitions.
      * @throws Exception and wraps any specific exception occurring during the initialization into it.
      */
-    void init() throws Exception {
-        final Properties properties = new Properties();
+    void init() throws InitException {
+        initProperties();
+        initDigitsMap();
+    }
+
+    private void initProperties() throws InitException {
         try (
                 final InputStream propertiesFileInputStream =
                         this.getClass().getResourceAsStream(APP_PROPERTIES_CLASSPATH_RESOURCE_PATH)) {
+            final Properties properties = new Properties();
             properties.load(propertiesFileInputStream);
             digitWidth = Integer.valueOf(properties.getProperty("digital.number.scanner.digit.width"));
             digitHeight = Integer.valueOf(properties.getProperty("digital.number.scanner.digit.height"));
@@ -62,16 +67,16 @@ public class DigitalNumberScanner {
             numberOfDigitsInAChunk = Integer.valueOf(properties.getProperty("digital.number.scanner.chunk.numberOfDigits"));
             chunkLineLength = numberOfDigitsInAChunk * digitWidth;
             digitReader = new DigitReader(digitWidth, digitHeight);
-            initDigitsMap();
-        } catch (IOException e) {
-            throw new Exception("Initialisation failed", e);
+        } catch (Exception e) {
+            throw new InitException(e);
         }
     }
 
-    public void scan(String inputFilePath) throws Exception {
+    public void scan(String inputFilePath) throws ScanException {
+        TextFileChunker inputFileChunker = null;
         try {
             logOutputProvider.accept(String.format("Reading %s %n", inputFilePath));
-            TextFileChunker inputFileChunker = new TextFileChunker(inputFilePath);
+            inputFileChunker = new TextFileChunker(inputFilePath);
             while (inputFileChunker.hasNext()) {
                 String chunk = inputFileChunker.next();
                 String[] lines = chunk.split(LINE_DELIMITER_REGEXP);
@@ -79,7 +84,7 @@ public class DigitalNumberScanner {
                     logOutputProvider.accept(String.format("Cannot read the chunk %n%s%n", chunk));
                     continue;
                 }
-                boolean hadIllegalSymbols = Boolean.FALSE;
+                boolean hadIllegalSymbols = false;
                 for (int digitNumber = 0; digitNumber < numberOfDigitsInAChunk; digitNumber++) {
                     String digit = digitReader.read(lines, digitNumber);
                     String output = recognizeDigit(digit);
@@ -93,8 +98,11 @@ public class DigitalNumberScanner {
                 }
                 dataOutputProvider.accept(String.format("%n"));
             }
-        } catch (FileNotFoundException e) {
-            throw new Exception("Processing failed", e);
+        } catch (Exception e) {
+            throw new ScanException(e);
+        }
+        finally {
+            if (null != inputFileChunker) { inputFileChunker.close(); }
         }
     }
 
@@ -103,14 +111,15 @@ public class DigitalNumberScanner {
     }
 
     /** Creates a new map and fills it from the statically defined file in resources.
-     * @throws Exception when initialisation fails.
+     * @throws InitException when initialisation fails.
      */
-    private void initDigitsMap() throws Exception {
+    private void initDigitsMap() throws InitException {
         digitsMap = new HashMap<String, Integer>();
+        TextFileChunker inputFileChunker = null;
         try {
             final InputStream digitsMapFileInputStream =
                     this.getClass().getResourceAsStream(DIGITS_MAP_FILE_CLASSPATH_RESOURCE_PATH);
-            TextFileChunker inputFileChunker = new TextFileChunker(digitsMapFileInputStream);
+            inputFileChunker = new TextFileChunker(digitsMapFileInputStream);
             if (inputFileChunker.hasNext()) {
                 String[] lines = inputFileChunker.next().split(LINE_DELIMITER_REGEXP);
                 for (int digitNumber = 0; digitNumber < numberOfDigitsInDigitsMap; digitNumber++) {
@@ -119,17 +128,19 @@ public class DigitalNumberScanner {
                 }
             }
             else {
-                throw new Exception("Failed reading digits map");
+                throw new InitException("Failed reading digits map");
             }
         }
-        catch (RuntimeException e) {
-            throw new Exception("Failed reading digits map", e);
+        catch (Exception e) {
+            throw new InitException(e);
         }
-
+        finally {
+            if (null != inputFileChunker) {inputFileChunker.close(); }
+        }
     }
 
     boolean validateChunkLines(String[] lines) {
-        if (lines == null) throw new IllegalArgumentException("Lines argument is null");
+        if (lines == null) { throw new IllegalArgumentException("Lines argument is null"); }
         if (digitHeight != lines.length) {
             logOutputProvider.accept(String.format("Incorrect number of lines in chunk. Expected %d, found %d.%n", digitHeight, lines.length));
             return false;

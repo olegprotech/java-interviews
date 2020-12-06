@@ -26,7 +26,7 @@ public class DigitalNumberScannerTest
      */
     @Test
     public void shouldScanSingleChunk() throws Exception {
-        StringBuffer consoleOutput = new StringBuffer();
+        StringBuilder consoleOutput = new StringBuilder();
         digitalNumberScanner.dataOutputProvider = consoleOutput::append;
         digitalNumberScanner.scan(this.getClass().getResource("/singleChunk").getPath());
         assertEquals(String.format("000000000%n"), consoleOutput.toString());
@@ -38,7 +38,7 @@ public class DigitalNumberScannerTest
      */
     @Test
     public void shouldScanMultipleChunk() throws Exception {
-        StringBuffer consoleOutput = new StringBuffer();
+        StringBuilder consoleOutput = new StringBuilder();
         digitalNumberScanner.dataOutputProvider = consoleOutput::append;
         digitalNumberScanner.scan(this.getClass().getResource("/multipleChunks").getPath());
         assertEquals("Output should contain 3 lines", 3, consoleOutput.toString().split(LINE_DELIMITER_REGEXP).length);
@@ -46,7 +46,7 @@ public class DigitalNumberScannerTest
 
     @Test
     public void shouldHaveOneILLIndicator() throws Exception {
-        StringBuffer consoleOutput = new StringBuffer();
+        StringBuilder consoleOutput = new StringBuilder();
         digitalNumberScanner.dataOutputProvider = consoleOutput::append;
         digitalNumberScanner.scan(this.getClass().getResource("/multipleChunksWithIllegalRow").getPath());
         assertTrue("Output should contain 1 ILL message", consoleOutput.toString().contains(ILLEGAL_INPUT_INDICATOR));
@@ -54,7 +54,7 @@ public class DigitalNumberScannerTest
 
     @Test
     public void shouldHaveOneUnrecognisedSymbolIndicator() throws Exception {
-        StringBuffer consoleOutput = new StringBuffer();
+        StringBuilder consoleOutput = new StringBuilder();
         digitalNumberScanner.dataOutputProvider = consoleOutput::append;
         digitalNumberScanner.scan(this.getClass().getResource("/multipleChunksWithIllegalRow").getPath());
         assertTrue("Output should contain 1 ? sign", consoleOutput.toString().contains(UNRECOGNIZED_SYMBOL_SIGN));
@@ -62,7 +62,7 @@ public class DigitalNumberScannerTest
 
     @Test
     public void shouldHaveUnrecognisedChunk() throws Exception {
-        StringBuffer output = new StringBuffer();
+        StringBuilder output = new StringBuilder();
         digitalNumberScanner.logOutputProvider = output::append;
         digitalNumberScanner.scan(this.getClass().getResource("/multipleChunksWithCorruptedChunk").getPath());
         assertTrue("Output should contain error message", output.toString().contains("Cannot read the chunk"));
