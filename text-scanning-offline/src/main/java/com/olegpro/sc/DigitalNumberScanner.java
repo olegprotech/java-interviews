@@ -8,12 +8,12 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Scanner;
+import java.util.function.Consumer;
 import java.util.regex.Pattern;
 
 /**
- * About 2h to the point of reading the input files and producing the expected output. No tests, no optimization.
- * Basic validation of the input files.
  * TODO:
+ * Handle "0" digit as in the single chunk. This would require to have different sizes for digits map and input files.
  * * Refactor to the proper classes and methods
  * * Clean up the variables naming
  * * Testing
@@ -26,10 +26,12 @@ public class DigitalNumberScanner {
     static final String UNRECOGNIZED_SYMBOL_SIGN = "?";
     int digitWidth;
     int digitHeight;
+    int numberOfDigitsInAChunk;
     int numberOfDigits;
     int lineLength;
     DigitReader digitReader = new DigitReader();
     Map<String, Integer> digitsMap;
+    Consumer<String> outputStreamProvider = (output) -> { System.out.print(output); };
 
     /**
      * This entry point expects the name of file to process as the first argument.
@@ -41,7 +43,7 @@ public class DigitalNumberScanner {
             String inputFilePath = args[0];
             DigitalNumberScanner digitalNumberScanner = new DigitalNumberScanner();
             digitalNumberScanner.init();
-            digitalNumberScanner.scanInputFile(inputFilePath);
+            digitalNumberScanner.scan(inputFilePath);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -60,35 +62,39 @@ public class DigitalNumberScanner {
             digitWidth = Integer.valueOf(properties.getProperty("digitWidth"));
             digitHeight = Integer.valueOf(properties.getProperty("digitHeight"));
             numberOfDigits = Integer.valueOf(properties.getProperty("numberOfDigits"));
-            lineLength = numberOfDigits * digitWidth;
+            numberOfDigitsInAChunk = Integer.valueOf(properties.getProperty("numberOfDigitsInAChunk"));
+            lineLength = numberOfDigitsInAChunk * digitWidth;
             initDigitsMap();
         } catch (IOException e) {
             throw new Exception("Initialisation failed", e);
         }
     }
 
-    private void scanInputFile(String inputFilePath) throws Exception {
+    public void scan(String inputFilePath) throws Exception {
         try {
             System.out.printf("Reading %s %n", inputFilePath);
             File inputFile = new File(inputFilePath);
             Scanner inputFileScanner = new Scanner(inputFile);
             inputFileScanner.useDelimiter(CHUNK_DELIMITER_REGEXP_PATTERN);
             while (inputFileScanner.hasNext()) {
-                // Read and validate that the lines conform to expectations. If not, the null is returned and the chunk is skipped.
-                String[] lines = readAndValidateNextChunk(inputFileScanner);
-                if (lines == null) continue;
+                String chunk = inputFileScanner.next();
+                String[] lines = chunk.split(LINE_DELIMITER_REGEXP);
+                if (!validateChunkLines(lines)) {
+                    System.out.printf("Cannot read the chunk %n%s%n", chunk);
+                    continue;
+                }
                 Boolean hadIllegalSymbols = Boolean.FALSE;
-                for (int digitNumber = 0; digitNumber < numberOfDigits; digitNumber++) {
+                for (int digitNumber = 0; digitNumber < numberOfDigitsInAChunk; digitNumber++) {
                     int offset = digitNumber * digitWidth;
                     String digit = digitReader.read(lines, offset, digitWidth, digitHeight);
                     String output = recognizeDigit(digit);
                     hadIllegalSymbols |= (UNRECOGNIZED_SYMBOL_SIGN.equals(output));
-                    System.out.print(output);
+                    outputStreamProvider.accept(output);
                 }
                 if (hadIllegalSymbols) {
-                    System.out.print("ILL");
+                    outputStreamProvider.accept("ILL");
                 }
-                System.out.println();
+                outputStreamProvider.accept(String.format("%n"));
             }
         } catch (FileNotFoundException e) {
             throw new Exception("Processing failed", e);
@@ -109,11 +115,11 @@ public class DigitalNumberScanner {
             inputFileScanner = new Scanner(stream);
             inputFileScanner.useDelimiter(CHUNK_DELIMITER_REGEXP_PATTERN);
             if (inputFileScanner.hasNext()) {
-                String[] lines = readAndValidateNextChunk(inputFileScanner);
+                String[] lines = inputFileScanner.next().split(LINE_DELIMITER_REGEXP);
                 for (int digitNumber = 0; digitNumber < numberOfDigits; digitNumber++) {
                     int offset = digitNumber * digitWidth;
                     String digit = digitReader.read(lines, offset, digitWidth, digitHeight);
-                    digitsMap.put(digit, Integer.valueOf(digitNumber+1));
+                    digitsMap.put(digit, Integer.valueOf(digitNumber));
                 }
             }
             else {
@@ -126,25 +132,10 @@ public class DigitalNumberScanner {
 
     }
 
-    /**
-     * @param inputFileScanner
-     * @return array of strings of expected size, or null in case the chunk doesn't conform to expectations.
-     */
-    String[] readAndValidateNextChunk(Scanner inputFileScanner) {
-        if (inputFileScanner == null) throw new IllegalArgumentException("Scanner argument is null.");
-        String chunk = inputFileScanner.next();
-        String[] lines = chunk.split(LINE_DELIMITER_REGEXP);
-        if (validateChunkLines(lines, digitHeight, lineLength)) return lines;
-        else {
-            System.out.printf("Cannot read the chunk %n%s%n", chunk);
-            return null;
-        }
-    }
-
-    boolean validateChunkLines(String[] lines, int numLinesInChunk, int lineLength) {
+    boolean validateChunkLines(String[] lines) {
         if (lines == null) throw new IllegalArgumentException("Lines argument is null");
-        if (numLinesInChunk != lines.length) {
-            System.out.printf("Incorrect number of lines in chunk. Expected %d, found %d.%n", numLinesInChunk, lines.length);
+        if (digitHeight != lines.length) {
+            System.out.printf("Incorrect number of lines in chunk. Expected %d, found %d.%n", digitHeight, lines.length);
             return false;
         }
         for (String line : lines) {
