@@ -29,7 +29,7 @@ public class DigitalNumberScanner {
     int numberOfDigitsInAChunk;
     int numberOfDigits;
     int lineLength;
-    DigitReader digitReader = new DigitReader();
+    DigitReader digitReader;
     Map<String, Integer> digitsMap;
     Consumer<String> outputStreamProvider = (output) -> { System.out.print(output); };
 
@@ -64,6 +64,7 @@ public class DigitalNumberScanner {
             numberOfDigits = Integer.valueOf(properties.getProperty("numberOfDigits"));
             numberOfDigitsInAChunk = Integer.valueOf(properties.getProperty("numberOfDigitsInAChunk"));
             lineLength = numberOfDigitsInAChunk * digitWidth;
+            digitReader = new DigitReader(digitWidth, digitHeight);
             initDigitsMap();
         } catch (IOException e) {
             throw new Exception("Initialisation failed", e);
@@ -85,10 +86,11 @@ public class DigitalNumberScanner {
                 }
                 Boolean hadIllegalSymbols = Boolean.FALSE;
                 for (int digitNumber = 0; digitNumber < numberOfDigitsInAChunk; digitNumber++) {
-                    int offset = digitNumber * digitWidth;
-                    String digit = digitReader.read(lines, offset, digitWidth, digitHeight);
+                    String digit = digitReader.read(lines, digitNumber);
                     String output = recognizeDigit(digit);
+                    // This operation is excessive. Can be optimized if done only in case the unrecognized characters.
                     hadIllegalSymbols |= (UNRECOGNIZED_SYMBOL_SIGN.equals(output));
+                    // Output as soon as possible.
                     outputStreamProvider.accept(output);
                 }
                 if (hadIllegalSymbols) {
@@ -117,8 +119,7 @@ public class DigitalNumberScanner {
             if (inputFileScanner.hasNext()) {
                 String[] lines = inputFileScanner.next().split(LINE_DELIMITER_REGEXP);
                 for (int digitNumber = 0; digitNumber < numberOfDigits; digitNumber++) {
-                    int offset = digitNumber * digitWidth;
-                    String digit = digitReader.read(lines, offset, digitWidth, digitHeight);
+                    String digit = digitReader.read(lines, digitNumber);
                     digitsMap.put(digit, Integer.valueOf(digitNumber));
                 }
             }

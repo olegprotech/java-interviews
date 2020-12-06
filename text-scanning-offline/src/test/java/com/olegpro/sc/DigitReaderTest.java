@@ -16,9 +16,9 @@ public class DigitReaderTest
     @Test
     public void shouldRead7()
     {
-        DigitReader digitReader = new DigitReader();
+        DigitReader digitReader = new DigitReader(3, 3);
         String[] lines = {" _  _  _ ", "| || |  |", "|_||_|  |"};
-        String digit = digitReader.read(lines, 6, 3, 3);
+        String digit = digitReader.read(lines, 2);
         assertEquals(" _   |  |", digit);
     }
 }
