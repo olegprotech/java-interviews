@@ -38,8 +38,15 @@ If the number cannot be read, replace the illegal characters with an "?" and app
 ## Non-Functional Requirements
 * NFR1 Please make it a maven project. 
 * NFR2 Testing your solution is important part of the task - we will pay special attention to the coverage and corner cases considered.
+  * AC 
+    * run.sh with all the test files supplied
+    * JUnit
+      * Cover all classes and non-private methods
+      * Cover all types of known input data problems with files provided + wrong size lines
+      * Cover missing input file test-case
 * NFR3 Also bear in mind that the implementation will set the stage for our live session to follow - as part of this session we will ask you to evolve your solution to support new requirement.
   * Extendable so that we can adopt new requirements relatively easily.
+  * Extract components where practical.
 
 ## Use-cases
 * UC1 Handle the file with multiple chunks
