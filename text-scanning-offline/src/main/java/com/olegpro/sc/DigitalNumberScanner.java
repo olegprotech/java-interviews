@@ -1,7 +1,5 @@
 package com.olegpro.sc;
 
-import java.io.FileNotFoundException;
-import java.io.IOException;
 import java.io.InputStream;
 import java.util.HashMap;
 import java.util.Map;
@@ -72,32 +70,41 @@ public class DigitalNumberScanner {
         }
     }
 
+    /** It will open the file, chunk it and process each chunk independently. Even if the chunk fails to process, others would still be attempted.
+     * @param inputFilePath
+     * @throws ScanException
+     */
     public void scan(String inputFilePath) throws ScanException {
         TextFileChunker inputFileChunker = null;
         try {
             logOutputProvider.accept(String.format("Reading %s %n", inputFilePath));
             inputFileChunker = new TextFileChunker(inputFilePath);
             while (inputFileChunker.hasNext()) {
-                String chunk = inputFileChunker.next();
-                String[] lines = chunk.split(LINE_DELIMITER_REGEXP);
-                if (!validateChunkLines(lines)) {
-                    logOutputProvider.accept(String.format("Cannot read the chunk %n%s%n", chunk));
-                    continue;
+                try {
+                    String chunk = inputFileChunker.next();
+                    String[] lines = chunk.split(LINE_DELIMITER_REGEXP);
+                    if (!validateChunkLines(lines)) {
+                        logOutputProvider.accept(String.format("Cannot read the chunk %n%s%n", chunk));
+                        continue;
+                    }
+                    boolean hadIllegalSymbols = false;
+                    for (int digitNumber = 0; digitNumber < numberOfDigitsInAChunk; digitNumber++) {
+                        String digit = digitReader.read(lines, digitNumber);
+                        String output = recognizeDigit(digit);
+                        // This operation is excessive. Can be optimized if done only in case the unrecognized characters.
+                        hadIllegalSymbols |= (UNRECOGNIZED_SYMBOL_SIGN.equals(output));
+                        // Output as soon as possible.
+                        dataOutputProvider.accept(output);
+                    }
+                    if (hadIllegalSymbols) {
+                        dataOutputProvider.accept(ILLEGAL_INPUT_INDICATOR);
+                    }
+                    dataOutputProvider.accept(String.format("%n"));
+                } catch (Exception e) {
+                    // this is what would go into log for investigation and manual correction later.
+                    logOutputProvider.accept("Failed processing one chunk but proceeding with others. Error" + e.getStackTrace());
                 }
-                boolean hadIllegalSymbols = false;
-                for (int digitNumber = 0; digitNumber < numberOfDigitsInAChunk; digitNumber++) {
-                    String digit = digitReader.read(lines, digitNumber);
-                    String output = recognizeDigit(digit);
-                    // This operation is excessive. Can be optimized if done only in case the unrecognized characters.
-                    hadIllegalSymbols |= (UNRECOGNIZED_SYMBOL_SIGN.equals(output));
-                    // Output as soon as possible.
-                    dataOutputProvider.accept(output);
-                }
-                if (hadIllegalSymbols) {
-                    dataOutputProvider.accept(ILLEGAL_INPUT_INDICATOR);
-                }
-                dataOutputProvider.accept(String.format("%n"));
-            }
+             }
         } catch (Exception e) {
             throw new ScanException(e);
         }
