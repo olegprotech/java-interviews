@@ -7,14 +7,12 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 import java.util.function.Consumer;
-import java.util.regex.Pattern;
 
 /**
- * TODO:
- * Handle "0" digit as in the single chunk. This would require to have different sizes for digits map and input files.
- * * Refactor to the proper classes and methods
- * * Clean up the variables naming
- * * Testing
+ * It's the main class. It loads the property file and the map of known digits, initializes the application.
+ * Servers as the entry point.
+ * Takes the file to be processed as a command line argument.
+ * Currently only supports single file. Can be easily extended to multiple files.
  */
 public class DigitalNumberScanner {
     static final String DIGITS_MAP_FILE_CLASSPATH_RESOURCE_PATH = "/digits";

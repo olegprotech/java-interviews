@@ -9,6 +9,7 @@ import static org.junit.Assert.assertTrue;
 
 /**
  * Unit test for simple DigitalNumberScanner.
+ * In fact some of them are technically integration / acceptance tests.
  */
 public class DigitalNumberScannerTest
 {
