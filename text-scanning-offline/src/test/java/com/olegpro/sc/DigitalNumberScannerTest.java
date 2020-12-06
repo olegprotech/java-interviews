@@ -33,12 +33,13 @@ public class DigitalNumberScannerTest
         assertEquals(String.format("000000000%n"), consoleOutput.toString());
     }
 
-    /**
-     * Validate whether the symbols are recognized correctly
-     */
     @Test
     public void shouldRecognizeDigits() {
         assertEquals( "Recognizing 7", "7", digitalNumberScanner.recognizeDigit(" _   |  |"));
+    }
+
+    @Test
+    public void shouldNotRecognizeDigits() {
         assertEquals( "Recognizing a corrupt symbol", UNRECOGNIZED_SYMBOL_SIGN, digitalNumberScanner.recognizeDigit("x_   |  |"));
     }
 }
