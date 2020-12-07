@@ -35,6 +35,10 @@ public class DigitalNumberScanner {
      * */
     public static void main(String[] args) {
         try {
+            if (null == args || args.length < 1) {
+                System.out.println("Please provide the name of the file as the first argument.");
+                System.exit(1);
+            }
             String inputFilePath = args[0];
             DigitalNumberScanner digitalNumberScanner = new DigitalNumberScanner();
             digitalNumberScanner.init();
