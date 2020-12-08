@@ -73,6 +73,31 @@ public class DigitalNumberScannerTest
         digitalNumberScanner.scan("/missingFile");
     }
 
+    /**
+     * Validate whether the symbols are recognized correctly.
+     * Need to move the file to test resources and load from there.
+     */
+    @Test
+    public void shouldHandleExceptionsWhenProcessingMultipleChunk() throws Exception {
+        digitalNumberScanner = new DigitalNumberScanner() {
+            private boolean toggle = true;
+          void scanChunk(String chunk) {
+              toggle = !toggle;
+              if (toggle) {
+                  throw new RuntimeException("Error processing chunk");
+              } else {
+                  dataOutputProvider.accept(String.format("000000000%n"));
+              }
+            }
+        };
+        digitalNumberScanner.init();
+        StringBuilder consoleOutput = new StringBuilder();
+        digitalNumberScanner.dataOutputProvider = consoleOutput::append;
+        digitalNumberScanner.scan(this.getClass().getResource("/multipleChunks").getPath());
+        assertEquals("Output should contain 3 lines", 2, consoleOutput.toString().split(LINE_DELIMITER_REGEXP).length);
+    }
+
+
     @Test
     public void shouldRecognizeDigits() {
         assertEquals( "Recognizing 7", "7", digitalNumberScanner.recognizeDigit(" _   |  |"));

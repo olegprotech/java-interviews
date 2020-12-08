@@ -86,24 +86,7 @@ public class DigitalNumberScanner {
             while (inputFileChunker.hasNext()) {
                 try {
                     String chunk = inputFileChunker.next();
-                    String[] lines = chunk.split(LINE_DELIMITER_REGEXP);
-                    if (!validateChunkLines(lines)) {
-                        logOutputProvider.accept(String.format("Cannot read the chunk %n%s%n", chunk));
-                        continue;
-                    }
-                    boolean hadIllegalSymbols = false;
-                    for (int digitNumber = 0; digitNumber < numberOfDigitsInAChunk; digitNumber++) {
-                        String digit = digitReader.read(lines, digitNumber);
-                        String output = recognizeDigit(digit);
-                        // This operation is excessive. Can be optimized if done only in case the unrecognized characters.
-                        hadIllegalSymbols |= (UNRECOGNIZED_SYMBOL_SIGN.equals(output));
-                        // Output as soon as possible.
-                        dataOutputProvider.accept(output);
-                    }
-                    if (hadIllegalSymbols) {
-                        dataOutputProvider.accept(ILLEGAL_INPUT_INDICATOR);
-                    }
-                    dataOutputProvider.accept(String.format("%n"));
+                    scanChunk(chunk);
                 } catch (Exception e) {
                     // this is what would go into log for investigation and manual correction later.
                     logOutputProvider.accept("Failed processing one chunk but proceeding with others. Error" + e.getStackTrace());
@@ -115,6 +98,27 @@ public class DigitalNumberScanner {
         finally {
             if (null != inputFileChunker) { inputFileChunker.close(); }
         }
+    }
+
+    void scanChunk(String chunk) {
+        String[] lines = chunk.split(LINE_DELIMITER_REGEXP);
+        if (!validateChunkLines(lines)) {
+            logOutputProvider.accept(String.format("Cannot read the chunk %n%s%n", chunk));
+            return;
+        }
+        boolean hadIllegalSymbols = false;
+        for (int digitNumber = 0; digitNumber < numberOfDigitsInAChunk; digitNumber++) {
+            String digit = digitReader.read(lines, digitNumber);
+            String output = recognizeDigit(digit);
+            // This operation is excessive. Can be optimized if done only in case the unrecognized characters.
+            hadIllegalSymbols |= (UNRECOGNIZED_SYMBOL_SIGN.equals(output));
+            // Output as soon as possible.
+            dataOutputProvider.accept(output);
+        }
+        if (hadIllegalSymbols) {
+            dataOutputProvider.accept(ILLEGAL_INPUT_INDICATOR);
+        }
+        dataOutputProvider.accept(String.format("%n"));
     }
 
     String recognizeDigit(String digit) {
