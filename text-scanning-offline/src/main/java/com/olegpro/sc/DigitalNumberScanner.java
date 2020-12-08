@@ -1,6 +1,7 @@
 package com.olegpro.sc;
 
 import java.io.InputStream;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
@@ -15,7 +16,7 @@ import java.util.function.Consumer;
 public class DigitalNumberScanner {
     static final String DIGITS_MAP_FILE_CLASSPATH_RESOURCE_PATH = "/digits";
     static final String APP_PROPERTIES_CLASSPATH_RESOURCE_PATH = "/DigitalNumberScanner.properties";
-    static final String LINE_DELIMITER_REGEXP = "\\n";
+    static final String LINE_DELIMITER_REGEXP = "\\r?\\n";
     static final String UNRECOGNIZED_SYMBOL_SIGN = "?";
     public static final String ILLEGAL_INPUT_INDICATOR = "ILL";
     private int digitWidth;
@@ -101,7 +102,8 @@ public class DigitalNumberScanner {
     }
 
     void scanChunk(String chunk) {
-        String[] lines = chunk.split(LINE_DELIMITER_REGEXP);
+        String[] lines = Arrays.stream(chunk.split(LINE_DELIMITER_REGEXP)).map(s -> s.replace("\r", "")).toArray(String[]::new);
+
         if (!validateChunkLines(lines)) {
             logOutputProvider.accept(String.format("Cannot read the chunk %n%s%n", chunk));
             return;
