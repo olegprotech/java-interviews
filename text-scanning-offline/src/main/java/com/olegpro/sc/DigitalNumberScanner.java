@@ -5,6 +5,9 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 /**
@@ -13,7 +16,7 @@ import java.util.function.Consumer;
  * Takes the file to be processed as a command line argument.
  * Currently only supports single file. Can be easily extended to multiple files.
  */
-public class DigitalNumberScanner {
+public class DigitalNumberScanner implements Runnable {
     static final String DIGITS_MAP_FILE_CLASSPATH_RESOURCE_PATH = "/digits";
     static final String APP_PROPERTIES_CLASSPATH_RESOURCE_PATH = "/DigitalNumberScanner.properties";
     static final String LINE_DELIMITER_REGEXP = "\\r?\\n";
@@ -28,6 +31,7 @@ public class DigitalNumberScanner {
     private Map<String, Integer> digitsMap;
     Consumer<String> dataOutputProvider = System.out::print;
     Consumer<String> logOutputProvider = System.out::print;
+    String inputFilePath;
 
     /**
      * This entry point expects the name of file to process as the first argument.
@@ -41,9 +45,25 @@ public class DigitalNumberScanner {
                 System.exit(1);
             }
             String inputFilePath = args[0];
-            DigitalNumberScanner digitalNumberScanner = new DigitalNumberScanner();
-            digitalNumberScanner.init();
-            digitalNumberScanner.scan(inputFilePath);
+            int numFiles = 10;
+            int numThreads = numFiles/2;
+            ExecutorService executor = Executors.newFixedThreadPool(numThreads);
+            StringBuilder[] outputProviders = new StringBuilder[numFiles];
+            for (int i = 0; i < numFiles; i++) {
+                outputProviders[i] = new StringBuilder();
+                outputProviders[i].append(String.format("Opened an output for file %d.%n", i));
+                DigitalNumberScanner digitalNumberScanner = new DigitalNumberScanner();
+                digitalNumberScanner.init();
+                // Channeling both data and log output to this file-specific string builder;
+                digitalNumberScanner.logOutputProvider = outputProviders[i]::append;
+                digitalNumberScanner.dataOutputProvider = outputProviders[i]::append;
+                digitalNumberScanner.inputFilePath = inputFilePath;
+                executor.execute(digitalNumberScanner);
+            }
+            executor.shutdown();
+            executor.awaitTermination(1, TimeUnit.MINUTES);
+            // Now flush all of the results into common output stream consistently for the file
+            Arrays.stream(outputProviders).sequential().map(StringBuilder::toString).forEach(System.out::print);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -56,6 +76,7 @@ public class DigitalNumberScanner {
     void init() throws InitException {
         initProperties();
         initDigitsMap();
+        this.inputFilePath = inputFilePath;
     }
 
     private void initProperties() throws InitException {
@@ -72,6 +93,14 @@ public class DigitalNumberScanner {
             digitReader = new DigitReader(digitWidth, digitHeight);
         } catch (Exception e) {
             throw new InitException(e);
+        }
+    }
+    @Override
+    public void run() {
+        try {
+            scan(inputFilePath);
+        } catch (ScanException e) {
+            logOutputProvider.accept("Processing of file "+ inputFilePath + " failed with exception " + e.getMessage());
         }
     }
 
