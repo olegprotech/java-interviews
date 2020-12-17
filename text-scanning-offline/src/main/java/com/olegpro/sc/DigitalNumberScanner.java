@@ -3,6 +3,7 @@ package com.olegpro.sc;
 import org.apache.commons.lang3.StringUtils;
 
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.Arrays;
@@ -129,21 +130,26 @@ public class DigitalNumberScanner {
         dataOutputProvider.accept(String.format("%n"));
     }
 
+    /** Always check for exact match first. If this didn't work - try a fuzzy match if it's enabled.
+     * @param digit
+     * @return
+     */
     String recognizeDigit(String digit) {
-        if (fuzzyMatchingMode) {
-            Map<String, Integer> distanceMap = new HashMap<>();
-            Map<Integer, String> inversedDistanceMap = new HashMap<>();
+        if (digitsMap.containsKey(digit)) {
+            return digitsMap.get(digit);
+        } else if (fuzzyMatchingMode) {
+            Map<Integer, String> symbolByDistanceMap = new HashMap<>();
             for (String symbol : digitsMap.keySet()) {
                 int distance = StringUtils.getLevenshteinDistance(symbol, digit);
-                distanceMap.put(symbol, Integer.valueOf(distance));
-                inversedDistanceMap.put(Integer.valueOf(distance), symbol);
+                symbolByDistanceMap.put(Integer.valueOf(distance), symbol);
             }
-            Integer min =  distanceMap.values().stream().min(Integer::compareTo).get();
-            String fuzzyMatchDigit = digitsMap.get(inversedDistanceMap.get(min).toString());
-            return (null != fuzzyMatchDigit) ? fuzzyMatchDigit.toString() : UNRECOGNIZED_SYMBOL_SIGN;
-        } else {
-            return (digitsMap.containsKey(digit)) ? digitsMap.get(digit).toString() : UNRECOGNIZED_SYMBOL_SIGN;
+            Integer minDistance =  symbolByDistanceMap.keySet().stream().min(Integer::compareTo).get();
+            String fuzzyMatchSymbol = symbolByDistanceMap.get(minDistance);
+            if (digitsMap.containsKey(fuzzyMatchSymbol)) {
+                return digitsMap.get(fuzzyMatchSymbol);
+            }
         }
+        return UNRECOGNIZED_SYMBOL_SIGN;
     }
 
     /** Creates a new map and fills it from the statically defined file in resources.
@@ -152,11 +158,12 @@ public class DigitalNumberScanner {
     private void initDigitsMap() throws InitException {
         digitsMap = new HashMap<String, String>();
         TextFileChunker inputFileChunker = null;
+        InputStream digitsValMapFileInputStream = null;
         try {
             final InputStream digitsMapFileInputStream =
                     this.getClass().getResourceAsStream(DIGITS_MAP_FILE_CLASSPATH_RESOURCE_PATH);
             inputFileChunker = new TextFileChunker(digitsMapFileInputStream);
-            final InputStream digitsValMapFileInputStream =
+            digitsValMapFileInputStream =
                     this.getClass().getResourceAsStream(DIGITS_VAL_MAP_FILE_CLASSPATH_RESOURCE_PATH);
             BufferedReader reader = new BufferedReader(new InputStreamReader(digitsValMapFileInputStream));
             String symbols = reader.readLine();
@@ -176,6 +183,13 @@ public class DigitalNumberScanner {
         }
         finally {
             if (null != inputFileChunker) {inputFileChunker.close(); }
+            if (null != digitsValMapFileInputStream) {
+                try {
+                    digitsValMapFileInputStream.close();
+                } catch (IOException e) {
+                    throw new InitException("Failed to close the digit value map file.", e);
+                }
+            }
         }
     }
 
