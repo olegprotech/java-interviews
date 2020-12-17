@@ -1,6 +1,10 @@
 package com.olegpro.sc;
 
+import org.apache.commons.lang3.StringUtils;
+
+import java.io.BufferedReader;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -15,6 +19,7 @@ import java.util.function.Consumer;
  */
 public class DigitalNumberScanner {
     static final String DIGITS_MAP_FILE_CLASSPATH_RESOURCE_PATH = "/digits";
+    static final String DIGITS_VAL_MAP_FILE_CLASSPATH_RESOURCE_PATH = "/digitsVal";
     static final String APP_PROPERTIES_CLASSPATH_RESOURCE_PATH = "/DigitalNumberScanner.properties";
     static final String LINE_DELIMITER_REGEXP = "\\r?\\n";
     static final String UNRECOGNIZED_SYMBOL_SIGN = "?";
@@ -25,9 +30,10 @@ public class DigitalNumberScanner {
     private int numberOfDigitsInDigitsMap;
     private int chunkLineLength;
     private DigitReader digitReader;
-    private Map<String, Integer> digitsMap;
+    private Map<String, String> digitsMap;
     Consumer<String> dataOutputProvider = System.out::print;
     Consumer<String> logOutputProvider = System.out::print;
+    boolean fuzzyMatchingMode = false;
 
     /**
      * This entry point expects the name of file to process as the first argument.
@@ -124,24 +130,41 @@ public class DigitalNumberScanner {
     }
 
     String recognizeDigit(String digit) {
-        return (digitsMap.containsKey(digit)) ? digitsMap.get(digit).toString() : UNRECOGNIZED_SYMBOL_SIGN;
+        if (fuzzyMatchingMode) {
+            Map<String, Integer> distanceMap = new HashMap<>();
+            Map<Integer, String> inversedDistanceMap = new HashMap<>();
+            for (String symbol : digitsMap.keySet()) {
+                int distance = StringUtils.getLevenshteinDistance(symbol, digit);
+                distanceMap.put(symbol, Integer.valueOf(distance));
+                inversedDistanceMap.put(Integer.valueOf(distance), symbol);
+            }
+            Integer min =  distanceMap.values().stream().min(Integer::compareTo).get();
+            String fuzzyMatchDigit = digitsMap.get(inversedDistanceMap.get(min).toString());
+            return (null != fuzzyMatchDigit) ? fuzzyMatchDigit.toString() : UNRECOGNIZED_SYMBOL_SIGN;
+        } else {
+            return (digitsMap.containsKey(digit)) ? digitsMap.get(digit).toString() : UNRECOGNIZED_SYMBOL_SIGN;
+        }
     }
 
     /** Creates a new map and fills it from the statically defined file in resources.
      * @throws InitException when initialisation fails.
      */
     private void initDigitsMap() throws InitException {
-        digitsMap = new HashMap<String, Integer>();
+        digitsMap = new HashMap<String, String>();
         TextFileChunker inputFileChunker = null;
         try {
             final InputStream digitsMapFileInputStream =
                     this.getClass().getResourceAsStream(DIGITS_MAP_FILE_CLASSPATH_RESOURCE_PATH);
             inputFileChunker = new TextFileChunker(digitsMapFileInputStream);
+            final InputStream digitsValMapFileInputStream =
+                    this.getClass().getResourceAsStream(DIGITS_VAL_MAP_FILE_CLASSPATH_RESOURCE_PATH);
+            BufferedReader reader = new BufferedReader(new InputStreamReader(digitsValMapFileInputStream));
+            String symbols = reader.readLine();
             if (inputFileChunker.hasNext()) {
                 String[] lines = inputFileChunker.next().split(LINE_DELIMITER_REGEXP);
                 for (int digitNumber = 0; digitNumber < numberOfDigitsInDigitsMap; digitNumber++) {
                     String digit = digitReader.read(lines, digitNumber);
-                    digitsMap.put(digit, Integer.valueOf(digitNumber));
+                    digitsMap.put(digit, String.valueOf(symbols.charAt(digitNumber)));
                 }
             }
             else {

@@ -61,6 +61,15 @@ public class DigitalNumberScannerTest
     }
 
     @Test
+    public void shouldRecognizeUsingFuzzyMatching() throws Exception {
+        StringBuilder consoleOutput = new StringBuilder();
+        digitalNumberScanner.dataOutputProvider = consoleOutput::append;
+        digitalNumberScanner.fuzzyMatchingMode = true;
+        digitalNumberScanner.scan(this.getClass().getResource("/multipleChunksWithIllegalRow").getPath());
+        assertTrue("Output should not contain ? sign", ! consoleOutput.toString().contains(UNRECOGNIZED_SYMBOL_SIGN));
+    }
+
+    @Test
     public void shouldHaveUnrecognisedChunk() throws Exception {
         StringBuilder output = new StringBuilder();
         digitalNumberScanner.logOutputProvider = output::append;
@@ -101,6 +110,12 @@ public class DigitalNumberScannerTest
     @Test
     public void shouldRecognizeDigits() {
         assertEquals( "Recognizing 7", "7", digitalNumberScanner.recognizeDigit(" _   |  |"));
+    }
+
+    @Test
+    public void shouldRecognizeDigitsUsingFuzzyMatching() {
+        digitalNumberScanner.fuzzyMatchingMode = true;
+        assertEquals( "Recognizing H expect 4", "4", digitalNumberScanner.recognizeDigit("   |_|| |"));
     }
 
     @Test
