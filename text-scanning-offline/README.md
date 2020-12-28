@@ -66,3 +66,62 @@ If the number cannot be read, replace the illegal characters with an "?" and app
 * Much more input validation
 * Infer the sizing from the digit map file... maybe?
 * Do we have to statically define the amount of digits in the number? Definitely not... this can be inferred by dividing the line length by the digit width.
+
+# Extensions
+* DONE Recognize non-digit symbols, e.g. letter "A"
+* DONE Fuzzy-match instead of showing "?" in case of unrecognized symbol.
+* Parallelize processing a really large file
+
+## Parallelize processing a really large file
+When we have a really large file, at the moment it will be parsed sequentially and will take a long time. 
+We need to speed up processing of the large file, but keep the order of output the same.
+Assume what takes time is the actual processing and not the file I/O.
+
+Functional Requirements
+* Read large blocks of text from file and process them in parallel
+* Limit the amount of blocks processed down to the amount of cores. E.g. if computer has 8 CPU cores overall, limit processing down to 5 in parallel.
+* Limit the amount of data read into memory. 
+  * If it's a 100 GB file but computer has 5GB RAM available for the app, only load 5*10^9 / 200 byte = 2.5*10^7 = 25 M chunks. This means 1 block should not take more than 5 M chunks.
+  * Let's say it will be a 1000 chunks each time. This way we preserve memory well.
+  * Pre-fetch M blocks.
+* Write the output as soon as the next block in order is ready.
+
+One way we can do that is to have one process split the file into multiple files, another process taking them as unputs.
+More optimal way would be to use pointers and start reading the file in parallel starting at various points.
+Using RxJava/Reactor to develop this using observable pattern.
+File Chunker >> Observable1
+Observable1 >> Aggregator
+
+We can do this in threads by creating batches of e.g. 10 blocks, and waiting for all of them to finish before reading the next batch. This is fairly inflexible.
+
+Or we can separate into concurrent threads.
+
+So what we can have is:
+* Producer
+  * Separate thread that pre-fetches the file sequentially and populates the queue of tasks.
+  * Runs in the loop. Checks the queue size. If it's less than the target length, creates the next task.
+  * Increments the total number of blocks
+* Task Queue
+  * FIFO
+  * LinkedList a 
+* Task Scheduler
+  * Takes the task from the queue and sends to ExecutionService
+  * Removes the task from the queue
+* Task
+  * Has the block of input
+  * Has the block number
+  * Chunks and scans the block.
+  * Buffers the results into the StringBuilder
+  * Once ready, puts the buffer to the results map
+* Results Queue
+  * Map<Block Number, Block Results Buffer>
+* Results Aggregator
+  * Has the number of the current block starting from zero
+  * Has the number of the largest block number
+  * Loops while current block is less or equal to the number of blocks
+  * Checks the map for result at the next position
+  * If there is something, processes it, removes from the map and the queue
+  * If there is nothing, can have a little wait before trying again.
+  
+
+

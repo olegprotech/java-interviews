@@ -6,10 +6,11 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Properties;
+import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 /**
@@ -30,6 +31,11 @@ public class DigitalNumberScanner {
     private int numberOfDigitsInAChunk;
     private int numberOfDigitsInDigitsMap;
     private int chunkLineLength;
+    private int numberOfChunksInBlock = 100;// TODO to property file
+    private int numberOfPreFetchBlocks = 15;// TODO to property file
+    private int numberOfParallelBlocksProcessed = 5;// TODO to property file
+
+
     private DigitReader digitReader;
     private Map<String, String> digitsMap;
     Consumer<String> dataOutputProvider = System.out::print;
@@ -42,18 +48,29 @@ public class DigitalNumberScanner {
      * For simplicity, leaving it to a single file for now.
      * */
     public static void main(String[] args) {
+        long startTime = System.currentTimeMillis();
         try {
             if (null == args || args.length < 1) {
                 System.out.println("Please provide the name of the file as the first argument.");
                 System.exit(1);
             }
             String inputFilePath = args[0];
+            boolean parallel = false;
+            if (args.length >= 2) {
+                parallel = ("parallel".equals(args[1]));
+            }
             DigitalNumberScanner digitalNumberScanner = new DigitalNumberScanner();
             digitalNumberScanner.init();
-            digitalNumberScanner.scan(inputFilePath);
+            //digitalNumberScanner.fuzzyMatchingMode = true;
+            if (parallel) {
+                digitalNumberScanner.scanFileParallel(inputFilePath);
+            } else {
+                digitalNumberScanner.scanFile(inputFilePath);
+            }
         } catch (Exception e) {
             e.printStackTrace();
         }
+        System.out.print(String.format("Completed in %d ms. %n", System.currentTimeMillis() - startTime));
     }
 
     /**
@@ -86,7 +103,7 @@ public class DigitalNumberScanner {
      * @param inputFilePath
      * @throws ScanException
      */
-    public void scan(String inputFilePath) throws ScanException {
+    public void scanFile(String inputFilePath) throws ScanException {
         TextFileChunker inputFileChunker = null;
         try {
             logOutputProvider.accept(String.format("Reading %s %n", inputFilePath));
@@ -108,7 +125,68 @@ public class DigitalNumberScanner {
         }
     }
 
+    /** It will open the file, chunk it and process each chunk independently. Even if the chunk fails to process, others would still be attempted.
+     * @param inputFilePath
+     * @throws ScanException
+     */
+    public void scanFileParallel(String inputFilePath) throws ScanException {
+        TextFileChunker inputFileChunker = null;
+
+        try {
+            logOutputProvider.accept(String.format("Reading %s %n", inputFilePath));
+            inputFileChunker = new TextFileChunker(inputFilePath);
+            List<String> block = new LinkedList<>();
+            int blockNumber = 0;
+            LinkedList<Future<String>> resultsQueue = new LinkedList<>();
+            ExecutorService scanningExecutor = Executors.newFixedThreadPool(numberOfParallelBlocksProcessed);
+            ResultsAggregator resultsAggregator = new ResultsAggregator(resultsQueue, this.dataOutputProvider, this.logOutputProvider);
+            Thread resultsAggregatorThread = new Thread(resultsAggregator);
+            resultsAggregatorThread.start();
+
+            while (inputFileChunker.hasNext()) {
+                if (resultsQueue.size() >= numberOfPreFetchBlocks) {
+                    logOutputProvider.accept(String.format("Waiting for the queue to clear before sceduling more tasks. %n") );
+                    TimeUnit.MILLISECONDS.sleep(1);
+                    continue;
+                }
+                try {
+                    String chunk = inputFileChunker.next();
+                    block.add(chunk);
+                    if (block.size() == numberOfChunksInBlock) {
+                        Task task = new Task(block, blockNumber, this);
+                        // submit the task and add to results
+                        resultsQueue.add(scanningExecutor.submit(task));
+                        // starting the new block
+                        block = new LinkedList<>();
+                        blockNumber++;
+                    }
+                } catch (Exception e) {
+                    // this is what would go into log for investigation and manual correction later.
+                    logOutputProvider.accept("Failed processing one chunk but proceeding with others. Error" + e.getStackTrace());
+                }
+            }
+            // submitting the last task
+            if (block.size() != 0) {
+                Task task = new Task(block, blockNumber, this);
+                resultsQueue.add(scanningExecutor.submit(task));
+            }
+            resultsAggregator.finishedPublishing = true;
+            scanningExecutor.shutdown();
+            resultsAggregatorThread.join();
+            scanningExecutor.awaitTermination(10, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            throw new ScanException(e);
+        }
+        finally {
+            if (null != inputFileChunker) { inputFileChunker.close(); }
+        }
+    }
+
     void scanChunk(String chunk) {
+        scanChunk(chunk, this.dataOutputProvider, this.logOutputProvider);
+    }
+
+    void scanChunk(String chunk, Consumer<String> dataOutputProvider, Consumer<String> logOutputProvider) {
         String[] lines = Arrays.stream(chunk.split(LINE_DELIMITER_REGEXP)).map(s -> s.replace("\r", "")).toArray(String[]::new);
 
         if (!validateChunkLines(lines)) {
@@ -135,6 +213,12 @@ public class DigitalNumberScanner {
      * @return
      */
     String recognizeDigit(String digit) {
+        //TODO Here we are artificially slowing down the process to simulate a complex processing that benefits from parallel execution.
+        try {
+            TimeUnit.MICROSECONDS.sleep(1);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
         if (digitsMap.containsKey(digit)) {
             return digitsMap.get(digit);
         } else if (fuzzyMatchingMode) {
