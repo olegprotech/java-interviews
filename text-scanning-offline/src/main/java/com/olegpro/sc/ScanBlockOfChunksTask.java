@@ -4,8 +4,8 @@ import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.function.Consumer;
 
-public class Task implements Callable<String> {
-    public Task(List<String> block, int blockNumber, DigitalNumberScanner scanner) {
+public class ScanBlockOfChunksTask implements Callable<String> {
+    public ScanBlockOfChunksTask(List<String> block, int blockNumber, DigitalNumberScanner scanner) {
         this.block = block;
         this.blockNumber = blockNumber;
         this.scanner = scanner;

@@ -9,7 +9,6 @@ import java.io.InputStreamReader;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
@@ -26,6 +25,7 @@ public class DigitalNumberScanner {
     static final String LINE_DELIMITER_REGEXP = "\\r?\\n";
     static final String UNRECOGNIZED_SYMBOL_SIGN = "?";
     public static final String ILLEGAL_INPUT_INDICATOR = "ILL";
+    public static final int SYMBOL_RECOGNITION_ARTIFICIAL_SLOWDOWN_MICROSECONDS = 1;
     private int digitWidth;
     private int digitHeight;
     private int numberOfDigitsInAChunk;
@@ -41,6 +41,7 @@ public class DigitalNumberScanner {
     Consumer<String> dataOutputProvider = System.out::print;
     Consumer<String> logOutputProvider = System.out::print;
     boolean fuzzyMatchingMode = false;
+    boolean delayArtificially = false;
 
     /**
      * This entry point expects the name of file to process as the first argument.
@@ -56,11 +57,16 @@ public class DigitalNumberScanner {
             }
             String inputFilePath = args[0];
             boolean parallel = false;
+            boolean delay = false;
             if (args.length >= 2) {
                 parallel = ("parallel".equals(args[1]));
             }
+            if (args.length >= 3) {
+                delay = ("delay".equals(args[2]));
+            }
             DigitalNumberScanner digitalNumberScanner = new DigitalNumberScanner();
             digitalNumberScanner.init();
+            digitalNumberScanner.delayArtificially = delay;
             //digitalNumberScanner.fuzzyMatchingMode = true;
             if (parallel) {
                 digitalNumberScanner.scanFileParallel(inputFilePath);
@@ -125,7 +131,12 @@ public class DigitalNumberScanner {
         }
     }
 
-    /** It will open the file, chunk it and process each chunk independently. Even if the chunk fails to process, others would still be attempted.
+    /** It will open the file, read it sequentially, break down into blocks of chunks and process them in parallel.
+     *  Each chunk in a block is then processed sequentially inside of a separate process.
+     *  Even if the chunk fails to process, others would still be attempted.
+     *  It ensures that no more than certain amount of blocks are loaded into memory at every point in time.
+     *  Maximum queue size should be larger than the thread pool size so that there are blocks pre-fetched and ready to be processed.
+     *  Results are aggregated and written to output in the sequential order in a separate thread.
      * @param inputFilePath
      * @throws ScanException
      */
@@ -137,15 +148,14 @@ public class DigitalNumberScanner {
             inputFileChunker = new TextFileChunker(inputFilePath);
             List<String> block = new LinkedList<>();
             int blockNumber = 0;
-            LinkedList<Future<String>> resultsQueue = new LinkedList<>();
             ExecutorService scanningExecutor = Executors.newFixedThreadPool(numberOfParallelBlocksProcessed);
-            ResultsAggregator resultsAggregator = new ResultsAggregator(resultsQueue, this.dataOutputProvider, this.logOutputProvider);
+            ResultsAggregator resultsAggregator = new ResultsAggregator(this.dataOutputProvider, this.logOutputProvider);
             Thread resultsAggregatorThread = new Thread(resultsAggregator);
             resultsAggregatorThread.start();
 
             while (inputFileChunker.hasNext()) {
-                if (resultsQueue.size() >= numberOfPreFetchBlocks) {
-                    logOutputProvider.accept(String.format("Waiting for the queue to clear before sceduling more tasks. %n") );
+                if (resultsAggregator.size() >= numberOfPreFetchBlocks) {
+                    logOutputProvider.accept(String.format("Waiting for the queue to clear before scheduling more tasks. %n") );
                     TimeUnit.MILLISECONDS.sleep(1);
                     continue;
                 }
@@ -153,9 +163,9 @@ public class DigitalNumberScanner {
                     String chunk = inputFileChunker.next();
                     block.add(chunk);
                     if (block.size() == numberOfChunksInBlock) {
-                        Task task = new Task(block, blockNumber, this);
+                        ScanBlockOfChunksTask scanBlockOfChunksTask = new ScanBlockOfChunksTask(block, blockNumber, this);
                         // submit the task and add to results
-                        resultsQueue.add(scanningExecutor.submit(task));
+                        resultsAggregator.add(scanningExecutor.submit(scanBlockOfChunksTask));
                         // starting the new block
                         block = new LinkedList<>();
                         blockNumber++;
@@ -167,8 +177,8 @@ public class DigitalNumberScanner {
             }
             // submitting the last task
             if (block.size() != 0) {
-                Task task = new Task(block, blockNumber, this);
-                resultsQueue.add(scanningExecutor.submit(task));
+                ScanBlockOfChunksTask scanBlockOfChunksTask = new ScanBlockOfChunksTask(block, blockNumber, this);
+                resultsAggregator.add(scanningExecutor.submit(scanBlockOfChunksTask));
             }
             resultsAggregator.finishedPublishing = true;
             scanningExecutor.shutdown();
@@ -186,6 +196,7 @@ public class DigitalNumberScanner {
         scanChunk(chunk, this.dataOutputProvider, this.logOutputProvider);
     }
 
+    /** Added this method signature to support parallel processing where the data output has to be buffered independently for parallel processes. */
     void scanChunk(String chunk, Consumer<String> dataOutputProvider, Consumer<String> logOutputProvider) {
         String[] lines = Arrays.stream(chunk.split(LINE_DELIMITER_REGEXP)).map(s -> s.replace("\r", "")).toArray(String[]::new);
 
@@ -214,11 +225,8 @@ public class DigitalNumberScanner {
      */
     String recognizeDigit(String digit) {
         //TODO Here we are artificially slowing down the process to simulate a complex processing that benefits from parallel execution.
-        try {
-            TimeUnit.MICROSECONDS.sleep(1);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
+        delayArtificially();
+
         if (digitsMap.containsKey(digit)) {
             return digitsMap.get(digit);
         } else if (fuzzyMatchingMode) {
@@ -234,6 +242,16 @@ public class DigitalNumberScanner {
             }
         }
         return UNRECOGNIZED_SYMBOL_SIGN;
+    }
+
+    private void delayArtificially() {
+        if (delayArtificially) {
+            try {
+                TimeUnit.MICROSECONDS.sleep(SYMBOL_RECOGNITION_ARTIFICIAL_SLOWDOWN_MICROSECONDS);
+            } catch (InterruptedException e) {
+                logOutputProvider.accept(String.format("Failed to delay recognizeDigit with error %s %n", e.getMessage()));
+            }
+        }
     }
 
     /** Creates a new map and fills it from the statically defined file in resources.

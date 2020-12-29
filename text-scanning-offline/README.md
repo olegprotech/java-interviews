@@ -20,7 +20,7 @@ An digital.number.scanner.input file could contain up to 400 entries.
 * Unfortunately, the digital.number.scanner.classifier is not perfect and sometimes provides illegal characters that do not transform into a number.
 If the number cannot be read, replace the illegal characters with an "?" and append "ILL" to the output.
 
-Please make it a maven project. Testing your solution is important part of the task - we will pay special attention to the coverage and corner cases considered.
+Please make it a maven project. Testing your solution is important part of the scanBlockOfChunksTask - we will pay special attention to the coverage and corner cases considered.
 Also bear in mind that the implementation will set the stage for our live session to follow - as part of this session we will ask you to evolve your solution to support new requirement.
 
 ## Functional Decomposition
@@ -37,7 +37,7 @@ If the number cannot be read, replace the illegal characters with an "?" and app
 
 ## Non-Functional Requirements
 * NFR1 Please make it a maven project. 
-* NFR2 Testing your solution is important part of the task - we will pay special attention to the coverage and corner cases considered.
+* NFR2 Testing your solution is important part of the scanBlockOfChunksTask - we will pay special attention to the coverage and corner cases considered.
   * AC 
     * run.sh with all the test files supplied
     * JUnit
@@ -99,14 +99,14 @@ Or we can separate into concurrent threads.
 So what we can have is:
 * Producer
   * Separate thread that pre-fetches the file sequentially and populates the queue of tasks.
-  * Runs in the loop. Checks the queue size. If it's less than the target length, creates the next task.
+  * Runs in the loop. Checks the queue size. If it's less than the target length, creates the next scanBlockOfChunksTask.
   * Increments the total number of blocks
 * Task Queue
   * FIFO
   * LinkedList a 
 * Task Scheduler
-  * Takes the task from the queue and sends to ExecutionService
-  * Removes the task from the queue
+  * Takes the scanBlockOfChunksTask from the queue and sends to ExecutionService
+  * Removes the scanBlockOfChunksTask from the queue
 * Task
   * Has the block of input
   * Has the block number

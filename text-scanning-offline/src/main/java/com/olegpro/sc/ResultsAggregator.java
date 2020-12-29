@@ -7,19 +7,28 @@ import java.util.function.Consumer;
 
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
+/**
+ * I decided not to add the "implements Deque<>" as it would add too much noise.</>
+ */
 public class ResultsAggregator implements Runnable {
     public static final int TIMEOUT_MILLISECONDS = 1;
-    LinkedList<Future<String>> resultsQueue;
+    LinkedList<Future<String>> resultsQueue = new LinkedList<>();
     Consumer<String> dataOutputProvider;
     Consumer<String> logOutputProvider;
     boolean finishedPublishing = false;
 
-    public ResultsAggregator(LinkedList<Future<String>> resultsQueue, Consumer<String> dataOutputProvider, Consumer<String> logOutputProvider) {
-        this.resultsQueue = resultsQueue;
+    public ResultsAggregator(Consumer<String> dataOutputProvider, Consumer<String> logOutputProvider) {
         this.dataOutputProvider = dataOutputProvider;
         this.logOutputProvider = logOutputProvider;
     }
 
+    public void add(Future<String> result) {
+        resultsQueue.add(result);
+    }
+
+    public int size() {
+        return resultsQueue.size();
+    }
     @Override
     public void run() {
         while (true) {
