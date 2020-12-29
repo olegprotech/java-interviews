@@ -1,5 +1,17 @@
 # Digital Number Scanning Application
 
+## Scripts
+* com.sh generates classpath
+* run.sh executes all basic files
+* run-fuzzy.sh executes one file with the fuzzy matching turned on. No "?" and "ILL" when processing multipleChunksWithIllegalRow
+* run-noarg.sh demonstrates hadling this error scenario.
+
+Below 2 scripts are for testing the parallel processing mode. In this mode, the digit recognition is artificially slowed down.
+* run-noparallel.sh - scans the entire file sequentially
+
+* run-parallel.sh - scans large file in blocks in parallel threads ~4x faster
+
+## Introduction
 Suppose there are nine digit numbers represented in digital format.
 It looks like the following example ("." denotes a whitespace for your readability):
 
@@ -98,7 +110,7 @@ Or we can separate into concurrent threads.
 
 So what we can have is:
 * Producer
-  * Separate thread that pre-fetches the file sequentially and populates the queue of tasks.
+  * Main thread that pre-fetches the file sequentially and populates the queue of tasks.
   * Runs in the loop. Checks the queue size. If it's less than the target length, creates the next scanBlockOfChunksTask.
   * Increments the total number of blocks
 * Task Queue
