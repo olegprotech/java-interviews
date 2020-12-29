@@ -44,42 +44,6 @@ public class DigitalNumberScanner {
     boolean delayArtificially = false;
 
     /**
-     * This entry point expects the name of file to process as the first argument.
-     * It can be refactored to take in many files or a folder.
-     * For simplicity, leaving it to a single file for now.
-     * */
-    public static void main(String[] args) {
-        long startTime = System.currentTimeMillis();
-        try {
-            if (null == args || args.length < 1) {
-                System.out.println("Please provide the name of the file as the first argument.");
-                System.exit(1);
-            }
-            String inputFilePath = args[0];
-            boolean parallel = false;
-            boolean delay = false;
-            if (args.length >= 2) {
-                parallel = ("parallel".equals(args[1]));
-            }
-            if (args.length >= 3) {
-                delay = ("delay".equals(args[2]));
-            }
-            DigitalNumberScanner digitalNumberScanner = new DigitalNumberScanner();
-            digitalNumberScanner.init();
-            digitalNumberScanner.delayArtificially = delay;
-            //digitalNumberScanner.fuzzyMatchingMode = true;
-            if (parallel) {
-                digitalNumberScanner.scanFileParallel(inputFilePath);
-            } else {
-                digitalNumberScanner.scanFile(inputFilePath);
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        System.out.print(String.format("Completed in %d ms. %n", System.currentTimeMillis() - startTime));
-    }
-
-    /**
      * Reads in the application properties as well as the digit symbol definitions.
      * @throws Exception and wraps any specific exception occurring during the initialization into it.
      */

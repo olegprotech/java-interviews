@@ -1,2 +1,3 @@
 #!/bin/bash
-java -cp ./target/*.jar com.olegpro.sc.DigitalNumberScanner ./input/large noparallel delay
+source ./bin/com.sh
+java -cp "$CP" com.olegpro.sc.App ./input/large delay

@@ -1,2 +1,3 @@
 #!/bin/bash
-java -cp ./target/*.jar com.olegpro.sc.DigitalNumberScanner
+source ./bin/com.sh
+java -cp "$CP" com.olegpro.sc.App

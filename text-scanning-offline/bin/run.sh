@@ -1,5 +1,6 @@
 #!/bin/bash
-java -cp ./target/*.jar com.olegpro.sc.DigitalNumberScanner ./input/singleChunk
-java -cp ./target/*.jar com.olegpro.sc.DigitalNumberScanner ./input/multipleChunks
-java -cp ./target/*.jar com.olegpro.sc.DigitalNumberScanner ./input/multipleChunksWithIllegalRow
-java -cp ./target/*.jar com.olegpro.sc.DigitalNumberScanner ./input/multipleChunksWithCorruptedChunk
+source ./bin/com.sh
+java -cp "$CP" com.olegpro.sc.App ./input/singleChunk
+java -cp "$CP" com.olegpro.sc.App ./input/multipleChunks
+java -cp "$CP" com.olegpro.sc.App ./input/multipleChunksWithIllegalRow
+java -cp "$CP" com.olegpro.sc.App ./input/multipleChunksWithCorruptedChunk
